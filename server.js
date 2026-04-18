@@ -180,7 +180,7 @@ async function processOrder(orderId, orderData = null) {
       orderData = data;
     }
 
-    console.log(`🎯 Pedido: "${orderData.description}" | Local: "${orderData.location}"`);
+    console.log(`🎯 Pedido: "${orderData.description}" | Cidade: "${orderData.city}" | Local: "${orderData.location}"`);
 
     // 3. Buscar prestadores ativos
     const { data: helpers, error: helpersError } = await supabase
@@ -202,14 +202,18 @@ async function processOrder(orderId, orderData = null) {
     }
 
     // 4. Filtrar por cidade (com fallback para todos)
+    const orderCity = (orderData.city || '').toLowerCase().trim();
     const orderLocation = (orderData.location || '').toLowerCase().trim();
-    const locationParts = orderLocation.split(/[\s,\-\/]+/).filter(w => w.length > 1);
+    
+    // Tentamos usar a cidade nova primeiro, senão cai pro fallback da localização
+    const searchTerms = orderCity ? orderCity.split(/[\s,\-\/]+/).filter(w => w.length > 1) 
+                                  : orderLocation.split(/[\s,\-\/]+/).filter(w => w.length > 1);
 
     const matchedHelpers = (helpers || []).filter((helper) => {
       const helperCity = ((helper.city || '') + ' ' + (helper.service_type || '')).toLowerCase();
       if (!helperCity.trim()) return true;
       const cityParts = helperCity.split(/[\s,\-\/]+/).filter(w => w.length > 1);
-      return locationParts.some(w => helperCity.includes(w)) || cityParts.some(w => orderLocation.includes(w));
+      return searchTerms.some(w => helperCity.includes(w)) || cityParts.some(w => orderLocation.includes(w) || orderCity.includes(w));
     });
 
     const targetHelpers = matchedHelpers.length > 0 ? matchedHelpers : (helpers || []);
@@ -236,7 +240,8 @@ async function sendToHelpers(orderId, orderData, helpers, maxHelpers, delaySecon
 
   const message =
     `🚨 *NOVO PEDIDO - SOLFY*\n\n` +
-    `📍 *Local:* ${orderData.location}\n` +
+    `🏙️ *Cidade:* ${orderData.city || 'Não informada'}\n` +
+    `📍 *Bairro/Local:* ${orderData.location}\n` +
     `🛠 *Serviço:* ${orderData.description}\n` +
     `💰 *Valor:* ${valor}\n` +
     `⏰ *Urgência:* ${urgency}\n` +
